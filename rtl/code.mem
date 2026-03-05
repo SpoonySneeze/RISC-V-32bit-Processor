@@ -1,0 +1,7 @@
+// RISC-V Machine Code for Loop Program
+00500513  // addi x10, x0, 5    (Set counter to 5)
+00000593  // addi x11, x0, 0    (Initialize sum to 0)
+00A585B3  // add x11, x11, x10  (sum = sum + counter)
+FFF50513  // addi x10, x10, -1  (Decrement counter)
+FE051CE3  // bne x10, x0, -8    (If x10 != 0, jump back 2 instructions/8 bytes)
+00000013  // nop                (End of program)
