@@ -10,56 +10,68 @@
  * provides the stimulus (clocking and reset) required to drive the DUT 
  * (Device Under Test) and manages the simulation lifecycle. 
  * * Verification Features:
- * 1. Synchronous Reset: Ensures all pipeline registers and the Program Counter 
- * start at a deterministic state.
- * 2. Compliance Testing: Implements a Signature Dump mechanism to export 
- * memory contents, facilitating automated comparison against a Golden 
- * Instruction Set Simulator (ISS) like Imperas or Spike.
+ * 1. It is simple test as you can see in the code.mem file it is a simple loop and add program.
+ * 2. We are dumping things into the .vcd file so that we can look actually what's happning using GTKwave.
  * -----------------------------------------------------------------------------
  */
 
-module riscv_tb();
+module riscv_tb;
+
     reg clk;
     reg reset;
 
-    // Implementation Detail: DUT Instantiation
-    // The processor top-level core is instantiated as the Device Under Test.
+    // Instantiate DUT
     risc_v_top dut (
         .clk(clk),
         .reset(reset)
     );
 
-    // ------------------------------------------------------------------------
-    // 1. Clock Generation
-    // ------------------------------------------------------------------------
-    // Generates a 100MHz oscillating signal with a 50% duty cycle.
+    // Clock generation: 100MHz
+    always #5 clk = ~clk;
+
+    // Dump everything for GTKWave
     initial begin
-        clk = 0;
-        forever #5 clk = ~clk; 
+        $dumpfile("riscv_full.vcd");
+        $dumpvars(0, riscv_tb);
     end
 
-    // ------------------------------------------------------------------------
-    // 2. Stimulus and Observation
-    // ------------------------------------------------------------------------
+    // Reset sequence
     initial begin
-        // System Initialization
+        clk   = 0;
         reset = 1;
-        #20 reset = 0; // Assertion of reset for 2 full clock cycles.
-        
-        // Execution Window
-        // Allows the processor to execute instructions loaded in 'code.mem'.
-        #2000; 
-        
-        /*
-         * Architectural Note: Signature Dumping
-         * To verify ISA compliance, the first 4KB of Data Memory (DMEM) is 
-         * exported to an external file. This "Signature" represents the final 
-         * state of the execution and is used to validate the correctness of 
-         * the RTL against architectural benchmarks.
-         */
-        $writememh("rtl_signature.output", dut.DMEM.memory, 16'h0000, 16'h0FFF);
-        
-        $display("Simulation Finished. Signature dumped to rtl_signature.output");
+
+        #20;
+        reset = 0;     // release reset
+    end
+
+    // Stop simulation after some cycles
+    initial begin
+        #5000;
+        $display("TIMEOUT: Simulation finished.");
         $finish;
     end
+
+    // Monitor final write-back (this is your OUTPUT)
+    always @(posedge clk) begin
+        if (dut.final_reg_write_enable) begin
+            $display(
+                "[%0t] WB: x%0d <= %0d (0x%h)",
+                $time,
+                dut.final_write_reg_addr,
+                dut.final_write_data,
+                dut.final_write_data
+            );
+
+            // PASS condition for your loop
+            if (dut.final_write_reg_addr == 5'd11 &&
+                dut.final_write_data == 32'd15) begin
+                $display("=================================");
+                $display("PASS: Loop sum result = 15");
+                $display("=================================");
+                #20;
+                $finish;
+            end
+        end
+    end
+
 endmodule
